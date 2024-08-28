@@ -1,0 +1,27 @@
+﻿@page "/stuntleaders/details/{id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@inject IStuntLeaderService StuntLeaderService
+@inject NavigationManager NavigationManager
+@code {
+    [Parameter] public int id { get; set; }
+    private StuntLeaderDto stuntLeader;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stuntLeader = await StuntLeaderService.GetStuntLeaderByIdAsync(id);
+    }
+}
+
+@if (stuntLeader == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <h3>@stuntLeader.Name @stuntLeader.Surname</h3>
+    <p>Birthdate: @stuntLeader.Birthdate.ToShortDateString()</p>
+    <p>Alias: @stuntLeader.Alias</p>
+    <p>Joining Date: @stuntLeader.JoiningDate.ToShortDateString()</p>
+    <p>Salary: @stuntLeader.Salary</p>
+}

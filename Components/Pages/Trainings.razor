@@ -1,0 +1,22 @@
+﻿@page "/trainings"
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+<h3>Trainings</h3>
+
+<div>
+    <button @onclick="NavigateToExamTrainings">Exam Trainings</button>
+    <button @onclick="NavigateToGroupTrainings">Group Trainings</button>
+</div>
+
+@code {
+    private void NavigateToExamTrainings()
+    {
+        NavigationManager.NavigateTo("/examtrainings");
+    }
+
+    private void NavigateToGroupTrainings()
+    {
+        NavigationManager.NavigateTo("/grouptrainings");
+    }
+}

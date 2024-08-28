@@ -1,0 +1,126 @@
+﻿@page "/horses/details/{Id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Components.Services.Implementation
+@inject IHorseService HorseService
+@inject ITrainingService TrainingService
+@inject IMovieSetService MovieSetService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private HorseDto horse;
+    private List<TrainingDto> futureTrainings = new List<TrainingDto>();
+    private bool isLoading = true;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        horse = await HorseService.GetHorseByIdAsync(Id);
+        if (horse == null)
+        {
+            NavigationManager.NavigateTo("/notfound");
+        }
+        else
+        {
+            futureTrainings = (await TrainingService.GetFutureTrainingsForHorseAsync(Id)).ToList();
+            isLoading = false;
+        }
+    }
+
+    private async Task RemoveHorseFromTraining(int trainingId)
+    {
+        errorMessage = null;
+        try
+        {
+            await TrainingService.RemoveHorseFromTraining(Id, trainingId);
+            futureTrainings = (await TrainingService.GetFutureTrainingsForHorseAsync(Id)).ToList();
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task RemoveHorseFromMovieSet(int movieSetId)
+    {
+        errorMessage = null;
+        try
+        {
+            await MovieSetService.RemoveHorseFromMovieSetAsync(movieSetId, Id);
+            // Refresh the horse details to update the assigned movie sets list
+            horse = await HorseService.GetHorseByIdAsync(Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteHorseAndAssociations()
+    {
+        errorMessage = null;
+        try
+        {
+            await HorseService.DeleteHorseAsync(Id);
+            NavigationManager.NavigateTo("/horses"); // Navigate to the list of horses after deletion
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}
+
+<h3>Horse Details</h3>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (horse != null)
+{
+    <div>
+        <p><strong>Name:</strong> @horse.Name</p>
+        <p><strong>Birthdate:</strong> @horse.Birthdate.ToShortDateString()</p>
+        <p><strong>Status:</strong> @horse.Status</p>
+    </div>
+
+    <h4>Future Trainings</h4>
+    <ul>
+        @foreach (var training in futureTrainings)
+        {
+            <li>
+                @training.Description - @training.DateTime.ToShortDateString()
+                <button @onclick="() => RemoveHorseFromTraining(training.IdTraining)">Remove</button>
+            </li>
+        }
+    </ul>
+
+    <h4>Assigned Movie Sets</h4>
+    <ul>
+        @if (horse.Movies != null)
+        {
+            @foreach (var movieSet in horse.Movies)
+            {
+                <li>
+                    @movieSet.MovieTitle (Departure: @movieSet.DepartureDate.ToShortDateString() - Return: @movieSet.ReturnDate.ToShortDateString())
+                    <button @onclick="() => RemoveHorseFromMovieSet(movieSet.IdMovieSet)">Remove</button>
+                </li>
+            }
+        }
+    </ul>
+
+    <button class="btn btn-danger" @onclick="DeleteHorseAndAssociations">Delete Horse</button>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+}
+else
+{
+    <p>Horse not found.</p>
+}

@@ -1,0 +1,41 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\Natalia\\Desktop\\End (2)\\End\\Stunt\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\Stunt.bundle.scp.css",
+      "PackagePath": "staticwebassets\\Stunt.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\Users\\Natalia\\Desktop\\End (2)\\End\\Stunt\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "C:\\Users\\Natalia\\Desktop\\End (2)\\End\\Stunt\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "C:\\Users\\Natalia\\Desktop\\End (2)\\End\\Stunt\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "C:\\Users\\Natalia\\Desktop\\End (2)\\End\\Stunt\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.Stunt.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.Stunt.props",
+      "PackagePath": "build\\Stunt.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.Stunt.props",
+      "PackagePath": "buildMultiTargeting\\Stunt.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.Stunt.props",
+      "PackagePath": "buildTransitive\\Stunt.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

@@ -1,0 +1,34 @@
+﻿@page "/locations/details/{Id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@inject ILocationService LocationService
+@inject NavigationManager NavigationManager
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private LocationDto location;
+
+    protected override async Task OnInitializedAsync()
+    {
+        location = await LocationService.GetLocationByIdAsync(Id);
+        if (location == null)
+        {
+    // Handle not found case, e.g. navigate to a not found page
+            NavigationManager.NavigateTo("/notfound");
+        }
+    }
+}
+
+<h3>Location Details</h3>
+
+@if (location != null)
+{
+    <div>
+        <p><strong>Name:</strong> @location.Name</p>
+        <!-- Add more fields as needed -->
+    </div>
+}
+else
+{
+    <p>Loading...</p>
+}

@@ -1,0 +1,98 @@
+﻿@page "/moviesets"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject IMovieSetService MovieSetService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+<h3>Movie Sets List</h3>
+
+<ul>
+    @foreach (var movieSet in movieSets)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(movieSet.IdMovieSet)">
+                @movieSet.Title
+            </a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Movie Set</h3>
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Title:</label>
+        <InputText @bind-Value="newMovieSet.Title" />
+        <ValidationMessage For="@(() => newMovieSet.Title)" />
+    </div>
+    <div>
+        <label>Address:</label>
+        <InputText @bind-Value="newMovieSet.Address" />
+        <ValidationMessage For="@(() => newMovieSet.Address)" />
+    </div>
+    <div>
+        <label>StartDate:</label>
+        <InputDate @bind-Value="newMovieSet.StartDate" />
+        <ValidationMessage For="@(() => newMovieSet.StartDate)" />
+    </div>
+    
+    <div>
+        <label>EndDate:</label>
+        <InputDate @bind-Value="newMovieSet.EndDate" />
+        <ValidationMessage For="@(() => newMovieSet.EndDate)" />
+    </div>
+
+    <button type="submit">Add Movie Set</button>
+</EditForm>
+
+@code {
+    private List<MovieSetDto> movieSets;
+    private MovieSetDto newMovieSet = new MovieSetDto();
+    private EditContext editContext;
+    private ValidationMessageStore messageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        movieSets = (await MovieSetService.GetAllMovieSetsAsync()).ToList();
+        editContext = new EditContext(newMovieSet);
+        messageStore = new ValidationMessageStore(editContext);
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void ValidateForm()
+    {
+        messageStore.Clear();
+        if (newMovieSet.StartDate >= newMovieSet.EndDate)
+        {
+            messageStore.Add(() => newMovieSet.EndDate, "End date must be after the start date.");
+        }
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        ValidateForm();
+
+        if (editContext.GetValidationMessages().Any())
+        {
+            return;
+        }
+
+        var addedMovieSet = await MovieSetService.AddMovieSetAsync(newMovieSet);
+        movieSets.Add(addedMovieSet);
+        newMovieSet = new MovieSetDto(); // Reset the form
+        editContext = new EditContext(newMovieSet); // Reset the edit context
+        messageStore = new ValidationMessageStore(editContext); // Reset the validation message store
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/moviesets/details/{id}");
+    }
+}

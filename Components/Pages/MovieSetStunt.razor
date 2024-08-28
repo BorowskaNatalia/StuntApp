@@ -1,0 +1,139 @@
+﻿@page "/weather"
+@using Stunt.Models
+@using Stunt.Repositories.Interfaces
+@using System.Runtime.InteropServices.JavaScript
+@inject IRepository<MovieSet> MovieSets
+@inject IRepository<Stuntman> StuntmenRepository
+@inject IRepository<MovieStuntman> MRepository
+
+<PageTitle>Movie Sets</PageTitle>
+<h1>Movie Sets</h1>
+
+<div class="form-group">
+    <label for="selectedMovieSet">Choose a Movie Set:</label>
+    <select @bind="selectedMovieSetId" class="form-control" id="selectedMovieSet">
+        <option value="">-- Select a Movie Set --</option>
+        @foreach (var movieSet in movieSets)
+        {
+            <option value="@movieSet.IdMovieSet">@movieSet.Title</option>
+        }
+    </select>
+</div>
+
+
+@if (stuntmen != null && stuntmen.Any())
+{
+    <div class="form-group">
+        <label for="selectedStuntman">Select a Stuntman:</label>
+        <select @bind="selectedStuntmanId" class="form-control" id="selectedStuntmanId">
+            <option value="">-- Select a Stuntman --</option>
+            @foreach (var stuntman in stuntmen)
+            {
+                <option value="@stuntman.IdPerson">@stuntman.Name  @stuntman.Surname</option>
+            }
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="departureDate">Departure Date:</label>
+
+        
+    
+        <input type="date" @bind="departureDate" class="form-control" id="departureDate" />
+
+        <label for="returnDate">Return Date:</label>
+
+        
+    
+        <input type="date" @bind="returnDate" class="form-control" id="returnDate" />
+    </div>
+
+    <button class="btn btn-primary" @onclick="EventCallback.Factory.Create(this, ConfirmDates)">Confirm Dates</button>
+
+}
+else if (stuntmen != null && !stuntmen.Any())
+{
+    <p>No stuntmen available.</p>
+}
+
+
+@code {
+    private IEnumerable<MovieSet>? movieSets;
+    private IEnumerable<Stuntman>? stuntmen;
+    private string selectedMovieSetId;
+    private string selectedStuntmanId;
+    private DateTime departureDate;
+    private DateTime returnDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        movieSets = await MovieSets.GetAllAsync();
+        await LoadStuntmen(); 
+        StateHasChanged();
+    }
+
+    private async Task LoadStuntmen()
+    {
+        stuntmen = await StuntmenRepository.GetAllAsync();
+        Console.WriteLine($"Loaded {stuntmen.Count()} stuntmen");
+        StateHasChanged();
+    }
+
+    private EventCallback ConfirmDates => EventCallback.Factory.Create(this, async () =>
+    {
+        Console.WriteLine("ConfirmDates method called");
+        if (departureDate == default || returnDate == default || returnDate < departureDate)
+        {
+            Console.WriteLine("Invalid dates provided.");
+            return;
+        }
+    
+        if (await IsStuntmanAvailable(selectedStuntmanId, departureDate, returnDate))
+        {
+            await AddMovieStuntmanAssociation();
+            Console.WriteLine("Stuntman association added successfully.");
+        }
+        else
+        {
+            Console.WriteLine("Stuntman is not available for the selected dates.");
+        }
+    });
+
+    
+    private async Task<bool> IsStuntmanAvailable(string stuntmanId, DateTime start, DateTime end)
+    {
+        if (!int.TryParse(stuntmanId, out int stuntmanIdInt))
+        {
+            throw new ArgumentException("Invalid stuntman ID");
+        }
+        
+        var allAssignments = await MRepository.GetAllAsync();
+        
+        var stuntmanAssignments = allAssignments.Where(ms => ms.IdPerson == stuntmanIdInt);
+
+        foreach (var assignment in stuntmanAssignments)
+        {
+            if ((start >= assignment.DepartureDate && start <= assignment.ReturnDate) ||
+                (end >= assignment.DepartureDate && end <= assignment.ReturnDate) ||
+                (start <= assignment.DepartureDate && end >= assignment.ReturnDate))
+            {
+                return false; 
+            }
+        }
+        return true; 
+    }
+    
+    private async Task AddMovieStuntmanAssociation()
+    {
+        var newAssignment = new MovieStuntman
+        {
+            IdMovieSet = int.Parse(selectedMovieSetId),
+            IdPerson = int.Parse(selectedStuntmanId),
+            DepartureDate = departureDate,
+            ReturnDate = returnDate
+        };
+        await MRepository.AddAsync(newAssignment);
+        
+    }
+
+}

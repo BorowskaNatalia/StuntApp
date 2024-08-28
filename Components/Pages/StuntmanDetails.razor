@@ -1,0 +1,147 @@
+﻿@page "/stuntmen/details/{Id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Enum
+@inject IStuntmanService StuntmanService
+@inject ITrainingService TrainingService
+@inject IMovieSetService MovieSetService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private StuntmanDto stuntman;
+    private double newSalary;
+    private List<TrainingDto> trainings = new List<TrainingDto>();
+    private string errorMessage;
+    private string alias;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        stuntman = await StuntmanService.GetStuntmanByIdAsync(Id);
+        if (stuntman == null)
+        {
+            NavigationManager.NavigateTo("/notfound");
+        }
+        else
+        {
+            newSalary = stuntman.Salary;
+            trainings = (await TrainingService.GetTrainingsByStuntmanIdAsync(Id)).ToList();
+        }
+    }
+
+    private async Task UpdateSalary()
+    {
+        await StuntmanService.UpdateSalaryAsync(Id, newSalary);
+        stuntman.Salary = newSalary; // Update local state
+    }
+
+    private async Task RemoveStuntmanFromTraining(int trainingId)
+    {
+        await TrainingService.RemoveStuntmanFromTraining(trainingId, Id);
+        trainings = (await TrainingService.GetTrainingsByStuntmanIdAsync(Id)).ToList(); // Refresh the trainings list
+    }
+
+    private async Task RemoveStuntmanFromMovieSet(int movieSetId)
+    {
+        await MovieSetService.RemoveStuntmanFromMovieSet(movieSetId, Id);
+        stuntman = await StuntmanService.GetStuntmanByIdAsync(Id); // Refresh the stuntman details
+    }
+
+    private async Task DeleteStuntman()
+    {
+        await StuntmanService.DeleteStuntmanAsync(Id);
+        NavigationManager.NavigateTo("/stuntmen");
+    }
+    
+    private async Task PromoteStuntman()
+    {
+        errorMessage = null;
+        try
+        {
+            if (stuntman.Birthdate.AddYears(18) <= DateTime.Now)
+            {
+                await StuntmanService.PromoteStuntmanAsync(Id, alias);
+                stuntman = await StuntmanService.GetStuntmanByIdAsync(Id); // Refresh stuntman details
+            }
+            else
+            {
+                errorMessage = "Stuntman must be at least 18 years old to be promoted.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}
+
+<h3>Stuntman Details</h3>
+
+@if (stuntman != null)
+{
+    <div>
+        <p><strong>Name:</strong> @stuntman.Name</p>
+        <p><strong>Surname:</strong> @stuntman.Surname</p>
+        <p><strong>Alias:</strong> @stuntman.Alias</p>
+        <p><strong>Rank:</strong> @stuntman.Rank</p>
+        <p><strong>Birthdate:</strong> @stuntman.Birthdate.ToShortDateString()</p>
+        <p><strong>Joining Date:</strong> @stuntman.JoiningDate.ToShortDateString()</p>
+        <p><strong>Salary:</strong> @stuntman.Salary</p>
+    </div>
+    @if (stuntman.Rank == Rank.Cadet)
+    {
+        <div>
+            <label>Alias:</label>
+            <InputText @bind-Value="alias" />
+        </div>
+        <button class="btn btn-primary" @onclick="PromoteStuntman">Promote to Stuntman</button>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2">@errorMessage</div>
+    }
+
+    <h4>Update Salary</h4>
+    <EditForm Model="@newSalary" OnValidSubmit="UpdateSalary">
+        <div>
+            <label>New Salary:</label>
+            <InputNumber @bind-Value="newSalary" />
+        </div>
+        <button type="submit">Update Salary</button>
+    </EditForm>
+
+    <h4>Assigned Trainings</h4>
+    <ul>
+        @foreach (var training in trainings)
+        {
+            <li>
+                @training.Description 
+                <button @onclick="() => RemoveStuntmanFromTraining(training.IdTraining)">Remove</button>
+            </li>
+        }
+    </ul>
+
+    <h4>Assigned Movie Sets</h4>
+    <ul>
+        @if (stuntman.MovieSets != null)
+        {
+            @foreach (var movieSet in stuntman.MovieSets)
+            {
+                <li>
+                    @movieSet.MovieTitle (Departure: @movieSet.DepartureDate.ToShortDateString() - Return: @movieSet.ReturnDate.ToShortDateString())
+                    <button @onclick="() => RemoveStuntmanFromMovieSet(movieSet.IdMovieSet)">Remove</button>
+                </li>
+            }
+        }
+    </ul>
+
+    <button class="btn btn-danger" @onclick="DeleteStuntman">Delete Stuntman</button>
+}
+else
+{
+    <p>Loading...</p>
+}

@@ -1,0 +1,196 @@
+﻿@page "/trainings/details/{id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Enum
+@inject ITrainingService TrainingService
+@inject IStuntmanService StuntmanService
+@inject ILocationService LocationService
+@inject IStuntLeaderService StuntLeaderService
+@inject IHorseService HorseService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    private TrainingDto training;
+    private List<StuntmanDto> stuntmen = new List<StuntmanDto>();
+    private List<LocationDto> locations = new List<LocationDto>();
+    private List<StuntLeaderDto> stuntLeaders = new List<StuntLeaderDto>();
+    private List<HorseDto> availableHorses = new List<HorseDto>();
+    private int selectedStuntmanId;
+    private int selectedHorseId;
+    private bool isLoading = true;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            training = await TrainingService.GetTrainingByIdAsync(Id);
+            stuntmen = (await StuntmanService.GetAllStuntmenAsync()).ToList();
+            locations = (await LocationService.GetAllLocationsAsync()).ToList();
+            stuntLeaders = (await StuntLeaderService.GetAllStuntLeadersAsync()).ToList();
+
+            if (training?.TrainingTypes.Any(tt => tt.TrainingType == TrainingType.Horse) == true)
+            {
+                availableHorses = (await HorseService.GetAvailableHorsesAsync(training.DateTime))
+                    .Where(h => h.Status != Status.Pensioner)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+    }
+
+    private async Task AddStuntmanToTraining()
+    {
+        errorMessage = null;
+        try
+        {
+            if (selectedStuntmanId != 0)
+            {
+                await TrainingService.AddStuntmanToTraining(Id, selectedStuntmanId);
+                await LoadDataAsync(); // Refresh the training details
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task AddHorseToTraining()
+    {
+        errorMessage = null;
+        try
+        {
+            if (selectedHorseId != 0)
+            {
+                await TrainingService.AddHorseToTraining(Id, selectedHorseId);
+                await LoadDataAsync(); // Refresh the training details and available horses
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task RemoveStuntmanFromTraining(int stuntmanId)
+    {
+        errorMessage = null;
+        try
+        {
+            await TrainingService.RemoveStuntmanFromTraining(Id, stuntmanId);
+            await LoadDataAsync(); // Refresh the training details
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteTraining()
+    {
+        errorMessage = null;
+        try
+        {
+            await TrainingService.DeleteTrainingAsync(Id);
+            NavigationManager.NavigateTo("/trainings"); // Navigate back to the list of trainings
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}
+
+<h3>Training Details</h3>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (training != null)
+{
+    <div>
+        <p><strong>Description:</strong> @training.Description</p>
+        <p><strong>Date and Time:</strong> @training.DateTime</p>
+        <p><strong>Location:</strong> @locations.FirstOrDefault(loc => loc.IdLocation == training.IdLocation)?.Name</p>
+        <p><strong>Stunt Leader:</strong> @stuntLeaders.FirstOrDefault(sl => sl.IdPerson == training.IdStuntLeader)?.Name @stuntLeaders.FirstOrDefault(sl => sl.IdPerson == training.IdStuntLeader)?.Surname</p>
+        <div>
+            <label>Training Types:</label>
+            <ul>
+                @foreach (var trainingType in training.TrainingTypes)
+                {
+                    <li>@trainingType.TrainingType.ToString()</li>
+                }
+            </ul>
+        </div>
+        <div>
+            <h4>Participants</h4>
+            <ul>
+                @foreach (var stuntman in training.Stuntmen)
+                {
+                    <li>@stuntman.Name @stuntman.Surname <button @onclick="() => RemoveStuntmanFromTraining(stuntman.IdPerson)">Remove</button></li>
+                }
+            </ul>
+        </div>
+        <div>
+            <h4>Add Stuntman to Training</h4>
+            <label>Select Stuntman:</label>
+            <InputSelect @bind-Value="selectedStuntmanId">
+                <option value="0">Select a stuntman</option>
+                @foreach (var stuntman in stuntmen)
+                {
+                    <option value="@stuntman.IdPerson">@stuntman.Name @stuntman.Surname</option>
+                }
+            </InputSelect>
+            <button @onclick="AddStuntmanToTraining">Add Stuntman</button>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@errorMessage</div>
+            }
+        </div>
+
+        @if (training.TrainingTypes.Any(tt => tt.TrainingType == TrainingType.Horse))
+        {
+            <div>
+                <h4>Assigned Horses</h4>
+                <ul>
+                    @foreach (var horse in training.Horses)
+                    {
+                        <li>@horse.Name</li>
+                    }
+                </ul>
+                <h4>Add Horse to Training</h4>
+                <label>Select Horse:</label>
+                <InputSelect @bind-Value="selectedHorseId">
+                    <option value="0">Select a horse</option>
+                    @foreach (var horse in availableHorses)
+                    {
+                        <option value="@horse.IdHorse">@horse.Name</option>
+                    }
+                </InputSelect>
+                <button @onclick="AddHorseToTraining">Add Horse</button>
+            </div>
+        }
+        <div>
+            <button class="btn btn-danger" @onclick="DeleteTraining">Delete Training</button>
+        </div>
+    </div>
+}
+else
+{
+    <p>Training not found.</p>
+}

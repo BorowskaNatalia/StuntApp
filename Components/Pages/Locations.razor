@@ -1,0 +1,87 @@
+﻿@page "/locations"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@inject ILocationService LocationService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+<h3>Location List</h3>
+
+<ul>
+    @foreach (var location in locations)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(location.IdLocation)">
+                @location.Name
+            </a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Location</h3>
+
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name:</label>
+        <InputText @bind-Value="newLocation.Name" />
+        <ValidationMessage For="@(() => newLocation.Name)" />
+    </div>
+
+    <button type="submit">Add Location</button>
+</EditForm>
+
+@code {
+    private List<LocationDto> locations;
+    private LocationDto newLocation = new LocationDto();
+    private EditContext editContext;
+    private ValidationMessageStore messageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        locations = (await LocationService.GetAllLocationsAsync()).ToList();
+        editContext = new EditContext(newLocation);
+        messageStore = new ValidationMessageStore(editContext);
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void ValidateForm()
+    {
+        messageStore.Clear();
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        ValidateForm();
+
+        if (await LocationService.LocationNameExistsAsync(newLocation.Name))
+        {
+            messageStore.Add(() => newLocation.Name, "Location name must be unique.");
+            editContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        if (editContext.GetValidationMessages().Any())
+        {
+            return;
+        }
+
+        var addedLocation = await LocationService.AddLocationAsync(newLocation);
+        locations.Add(addedLocation);
+        newLocation = new LocationDto(); // Reset the form
+        editContext = new EditContext(newLocation); // Reset the edit context
+        messageStore = new ValidationMessageStore(editContext); // Reset the validation message store
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/locations/details/{id}");
+    }
+}

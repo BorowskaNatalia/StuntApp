@@ -1,0 +1,153 @@
+﻿@page "/grouptrainings"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Enum
+@using Stunt.Models
+@inject ITrainingService TrainingService
+@inject ILocationService LocationService
+@inject IStuntLeaderService StuntLeaderService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+<h3>Group Trainings</h3>
+
+<ul>
+    @foreach (var training in groupTrainings)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(training.IdTraining)">@training.Description</a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Group Training</h3>
+
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Description:</label>
+        <InputText @bind-Value="newGroupTraining.Description" />
+        <ValidationMessage For="@(() => newGroupTraining.Description)" />
+    </div>
+    <div>
+        <label>Date and Time:</label>
+        <InputDate @bind-Value="newGroupTraining.DateTime" />
+        <ValidationMessage For="@(() => newGroupTraining.DateTime)" />
+    </div>
+    <div>
+        <label>Location:</label>
+        <InputSelect @bind-Value="newGroupTraining.IdLocation">
+            @foreach (var location in locations)
+            {
+                <option value="@location.IdLocation">@location.Name</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newGroupTraining.IdLocation)" />
+    </div>
+    <div>
+        <label>Stunt Leader:</label>
+        <InputSelect @bind-Value="newGroupTraining.IdStuntLeader">
+            @foreach (var stuntLeader in stuntLeaders)
+            {
+                <option value="@stuntLeader.IdPerson">@stuntLeader.Name @stuntLeader.Surname</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newGroupTraining.IdStuntLeader)" />
+    </div>
+    <div>
+        <label>Training Types:</label>
+        @foreach (TrainingType trainingType in Enum.GetValues(typeof(TrainingType)))
+        {
+            <div>
+                <input type="checkbox" @onchange="e => OnTrainingTypeCheckedChanged(e, trainingType)" />
+                <label>@trainingType</label>
+            </div>
+        }
+        <ValidationMessage For="@(() => newGroupTraining.TrainingTypes)" />
+    </div>
+    <div>
+        <label>Difficulty:</label>
+        <InputSelect @bind-Value="newGroupTraining.Difficulty">
+            @foreach (var difficulty in Enum.GetValues(typeof(Difficulty)))
+            {
+                <option value="@difficulty">@difficulty</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newGroupTraining.Difficulty)" />
+    </div>
+
+    <button type="submit">Add Group Training</button>
+</EditForm>
+
+@code {
+    private List<GroupTrainingDto> groupTrainings;
+    private List<LocationDto> locations;
+    private List<StuntLeaderDto> stuntLeaders;
+    private GroupTrainingDto newGroupTraining = new GroupTrainingDto { TrainingTypes = new List<TrainingTypeMappingDto>() };
+    private EditContext editContext;
+    private ValidationMessageStore validationMessageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allTrainings = await TrainingService.GetAllTrainingsAsync();
+        groupTrainings = allTrainings.OfType<GroupTrainingDto>().ToList();
+        locations = (await LocationService.GetAllLocationsAsync()).ToList();
+        stuntLeaders = (await StuntLeaderService.GetAllStuntLeadersAsync()).ToList();
+        editContext = new EditContext(newGroupTraining);
+        validationMessageStore = new ValidationMessageStore(editContext);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (!newGroupTraining.TrainingTypes.Any())
+        {
+            // Show error message for missing training types
+            validationMessageStore.Add(() => newGroupTraining.TrainingTypes, "At least one training type must be selected.");
+            editContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        try
+        {
+            var addedTraining = await TrainingService.AddTrainingAsync(newGroupTraining);
+            groupTrainings.Add((GroupTrainingDto)addedTraining);
+            newGroupTraining = new GroupTrainingDto { TrainingTypes = new List<TrainingTypeMappingDto>() }; // Reset the form
+            editContext = new EditContext(newGroupTraining);
+            validationMessageStore.Clear();
+        }
+        catch (InvalidOperationException ex)
+        {
+            validationMessageStore.Add(() => newGroupTraining.Description, ex.Message);
+            editContext.NotifyValidationStateChanged();
+        }
+    }
+
+    private void OnTrainingTypeCheckedChanged(ChangeEventArgs e, TrainingType trainingType)
+    {
+        var isChecked = ((ChangeEventArgs)e).Value != null && bool.Parse(((ChangeEventArgs)e).Value.ToString());
+
+        if (isChecked)
+        {
+            if (!newGroupTraining.TrainingTypes.Any(tt => tt.TrainingType == trainingType))
+            {
+                newGroupTraining.TrainingTypes.Add(new TrainingTypeMappingDto { TrainingType = trainingType });
+            }
+        }
+        else
+        {
+            var itemToRemove = newGroupTraining.TrainingTypes.FirstOrDefault(tt => tt.TrainingType == trainingType);
+            if (itemToRemove != null)
+            {
+                newGroupTraining.TrainingTypes.Remove(itemToRemove);
+            }
+        }
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/trainings/details/{id}");
+    }
+}

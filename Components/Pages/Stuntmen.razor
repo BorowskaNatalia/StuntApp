@@ -1,0 +1,153 @@
+﻿@page "/stuntmen"
+@using Stunt.ModelsDto
+@using Stunt.Enum
+@using Stunt.Components.Services.Interfaces
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Linq.Expressions
+@inject IStuntmanService StuntmanService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+<h3>Stuntmen List</h3>
+
+<ul>
+    @foreach (var stuntman in stuntmen)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(stuntman.IdPerson)">
+                id: @stuntman.IdPerson | @stuntman.Name "@stuntman.Alias" @stuntman.Surname: @stuntman.Rank
+            </a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Stuntman</h3>
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit" FormName="addStuntmanForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name:</label>
+        <InputText @bind-Value="newStuntman.Name" />
+        <ValidationMessage For="@(() => newStuntman.Name)" />
+    </div>
+    <div>
+        <label>Surname:</label>
+        <InputText @bind-Value="newStuntman.Surname" />
+        <ValidationMessage For="@(() => newStuntman.Surname)" />
+    </div>
+    <div>
+        <label>Rank:</label>
+        <InputSelect @bind-Value="newStuntman.Rank">
+            @foreach (var rank in Enum.GetValues(typeof(Rank)))
+            {
+                <option value="@rank">@rank</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newStuntman.Rank)" />
+    </div>
+    <div>
+        <label>Birthdate:</label>
+        <InputDate @bind-Value="newStuntman.Birthdate" />
+        <ValidationMessage For="@(() => newStuntman.Birthdate)" />
+    </div>
+    @if (newStuntman.Rank == Rank.Stuntman)
+    {
+        <div>
+            <label>Alias:</label>
+            <InputText @bind-Value="newStuntman.Alias" />
+            <ValidationMessage For="@(() => newStuntman.Alias)" />
+        </div>
+    }
+
+    <button type="submit">Add Stuntman</button>
+</EditForm>
+
+@code {
+    private List<StuntmanDto> stuntmen;
+    private StuntmanDto newStuntman = new StuntmanDto();
+    private EditContext editContext;
+    private ValidationMessageStore messageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stuntmen = (await StuntmanService.GetAllStuntmenAsync()).ToList();
+        editContext = new EditContext(newStuntman);
+        messageStore = new ValidationMessageStore(editContext);
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void ValidateForm()
+    {
+        messageStore.Clear();
+        ValidateAlias();
+        ValidateAge();
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private void ValidateAlias()
+    {
+        if (newStuntman.Rank == Rank.Stuntman && string.IsNullOrEmpty(newStuntman.Alias))
+        {
+            messageStore.Add(() => newStuntman.Alias, "Alias is required for Stuntman rank.");
+        }
+    }
+
+    private void ValidateAge()
+    {
+        var age = CalculateAge(newStuntman.Birthdate);
+        if (newStuntman.Rank == Rank.Cadet && age < 14)
+        {
+            messageStore.Add(() => newStuntman.Birthdate, "Cadet must be at least 14 years old.");
+        }
+        else if (newStuntman.Rank == Rank.Stuntman && age < 18)
+        {
+            messageStore.Add(() => newStuntman.Birthdate, "Stuntman must be at least 18 years old.");
+        }
+    }
+
+    private int CalculateAge(DateTime birthdate)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - birthdate.Year;
+        if (birthdate.Date > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        ValidateForm();
+
+        if (editContext.GetValidationMessages().Any())
+        {
+            return;
+        }
+
+        if (newStuntman.Rank == Rank.Stuntman)
+        {
+            bool aliasExists = await StuntmanService.AliasExistsAsync(newStuntman.Alias);
+            if (aliasExists)
+            {
+                messageStore.Add(() => newStuntman.Alias, "Alias must be unique.");
+                editContext.NotifyValidationStateChanged();
+                return;
+            }
+        }
+
+        newStuntman.JoiningDate = DateTime.Today; // Ustawienie dzisiejszej daty dla JoiningDate
+
+        var addedStuntman = await StuntmanService.AddStuntmanAsync(newStuntman);
+        stuntmen.Add(addedStuntman);
+        newStuntman = new StuntmanDto(); // Reset the form
+        editContext = new EditContext(newStuntman); // Reset the edit context
+        messageStore = new ValidationMessageStore(editContext); // Reset the validation message store
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/stuntmen/details/{id}");
+    }
+}

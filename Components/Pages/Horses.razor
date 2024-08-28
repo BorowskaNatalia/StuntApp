@@ -1,0 +1,99 @@
+﻿@page "/horses"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Stunt.Enum
+@inject IHorseService HorseService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+<h3>Horse List</h3>
+
+<ul>
+    @foreach (var horse in horses)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(horse.IdHorse)">
+                @horse.Name
+            </a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Horse</h3>
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name:</label>
+        <InputText @bind-Value="newHorse.Name" />
+        <ValidationMessage For="@(() => newHorse.Name)" />
+    </div>
+    <div>
+        <label>Birthdate:</label>
+        <InputDate @bind-Value="newHorse.Birthdate" />
+        <ValidationMessage For="@(() => newHorse.Birthdate)" />
+    </div>
+    <div>
+        <label>Status:</label>
+        <InputSelect @bind-Value="newHorse.Status">
+            @foreach (var status in Enum.GetValues(typeof(Status)))
+            {
+                <option value="@status">@status</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newHorse.Status)" />
+    </div>
+
+    <button type="submit">Add Horse</button>
+</EditForm>
+
+@code {
+    private List<HorseDto> horses;
+    private HorseDto newHorse = new HorseDto();
+    private EditContext editContext;
+    private ValidationMessageStore messageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        horses = (await HorseService.GetAllHorsesAsync()).ToList();
+        editContext = new EditContext(newHorse);
+        messageStore = new ValidationMessageStore(editContext);
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void ValidateForm()
+    {
+        messageStore.Clear();
+        if (newHorse.Birthdate > DateTime.Today)
+        {
+            messageStore.Add(() => newHorse.Birthdate, "Birthdate must be in the past.");
+        }
+        editContext.NotifyValidationStateChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        ValidateForm();
+
+        if (editContext.GetValidationMessages().Any())
+        {
+            return;
+        }
+
+        var addedHorse = await HorseService.AddHorseAsync(newHorse);
+        horses.Add(addedHorse);
+        newHorse = new HorseDto(); // Reset the form
+        editContext = new EditContext(newHorse); // Reset the edit context
+        messageStore = new ValidationMessageStore(editContext); // Reset the validation message store
+        editContext.OnValidationRequested += (sender, eventArgs) => ValidateForm();
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/horses/details/{id}");
+    }
+}

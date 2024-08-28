@@ -1,0 +1,81 @@
+﻿@page "/stuntleaders"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@inject IStuntLeaderService StuntLeaderService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+<h3>Stunt Leaders List</h3>
+
+<ul>
+    @foreach (var stuntLeader in stuntLeaders)
+    {
+        <li>
+            <a @onclick="() => NavigateToDetails(stuntLeader.IdPerson)">
+                @stuntLeader.Name @stuntLeader.Surname
+            </a>
+        </li>
+    }
+</ul>
+
+<h3>Add New Stunt Leader</h3>
+
+<EditForm Model="@newStuntLeader" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Name:</label>
+        <InputText @bind-Value="newStuntLeader.Name" />
+        <ValidationMessage For="@(() => newStuntLeader.Name)" />
+    </div>
+    <div>
+        <label>Surname:</label>
+        <InputText @bind-Value="newStuntLeader.Surname" />
+        <ValidationMessage For="@(() => newStuntLeader.Surname)" />
+    </div>
+    <div>
+        <label>Birthdate:</label>
+        <InputDate @bind-Value="newStuntLeader.Birthdate" />
+        <ValidationMessage For="@(() => newStuntLeader.Birthdate)" />
+    </div>
+    <div>
+        <label>Alias:</label>
+        <InputText @bind-Value="newStuntLeader.Alias" />
+        <ValidationMessage For="@(() => newStuntLeader.Alias)" />
+    </div>
+    <div>
+        <label>Joining Date:</label>
+        <InputDate @bind-Value="newStuntLeader.JoiningDate" />
+        <ValidationMessage For="@(() => newStuntLeader.JoiningDate)" />
+    </div>
+    <div>
+        <label>Salary:</label>
+        <InputNumber @bind-Value="newStuntLeader.Salary" />
+        <ValidationMessage For="@(() => newStuntLeader.Salary)" />
+    </div>
+
+    <button type="submit">Add Stunt Leader</button>
+</EditForm>
+
+@code {
+    private List<StuntLeaderDto> stuntLeaders;
+    private StuntLeaderDto newStuntLeader = new StuntLeaderDto();
+
+    protected override async Task OnInitializedAsync()
+    {
+        stuntLeaders = (await StuntLeaderService.GetAllStuntLeadersAsync()).ToList();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        var addedStuntLeader = await StuntLeaderService.AddStuntLeaderAsync(newStuntLeader);
+        stuntLeaders.Add(addedStuntLeader);
+        newStuntLeader = new StuntLeaderDto(); // Reset the form
+    }
+
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/stuntleaders/details/{id}");
+    }
+}

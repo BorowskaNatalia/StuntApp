@@ -1,0 +1,161 @@
+﻿@page "/examtrainings"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Enum
+@using Stunt.Models
+@inject ITrainingService TrainingService
+@inject ILocationService LocationService
+@inject IStuntLeaderService StuntLeaderService
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+<h3>Exam Trainings</h3>
+@if (examTrainings != null && examTrainings.Any())
+{
+    <ul>
+        @foreach (var training in examTrainings)
+        {
+            <li>
+                <a @onclick="() => NavigateToDetails(training.IdTraining)">@training.Description</a>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No exam trainings found.</p>
+}
+
+<h3>Add New Exam Training</h3>
+
+<EditForm EditContext="@editContext" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Description:</label>
+        <InputText @bind-Value="newExamTraining.Description" />
+        <ValidationMessage For="@(() => newExamTraining.Description)" />
+    </div>
+    <div>
+        <label>Date and Time:</label>
+        <InputDate @bind-Value="newExamTraining.DateTime" />
+        <ValidationMessage For="@(() => newExamTraining.DateTime)" />
+    </div>
+    <div>
+        <label>Location:</label>
+        <InputSelect @bind-Value="newExamTraining.IdLocation">
+            @foreach (var location in locations)
+            {
+                <option value="@location.IdLocation">@location.Name</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newExamTraining.IdLocation)" />
+    </div>
+    <div>
+        <label>Stunt Leader:</label>
+        <InputSelect @bind-Value="newExamTraining.IdStuntLeader">
+            @foreach (var stuntLeader in stuntLeaders)
+            {
+                <option value="@stuntLeader.IdPerson">@stuntLeader.Name @stuntLeader.Surname</option>
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => newExamTraining.IdStuntLeader)" />
+    </div>
+    <div>
+        <label>Training Types:</label>
+        @foreach (TrainingType trainingType in Enum.GetValues(typeof(TrainingType)))
+        {
+            <div>
+                <input type="checkbox" @onchange="e => OnTrainingTypeCheckedChanged(e, trainingType)" />
+                <label>@trainingType</label>
+            </div>
+        }
+        <ValidationMessage For="@(() => newExamTraining.TrainingTypes)" />
+    </div>
+    <div>
+        <label>Examiner Licence:</label>
+        <InputText @bind-Value="newExamTraining.ExaminerLicence" />
+        <ValidationMessage For="@(() => newExamTraining.ExaminerLicence)" />
+    </div>
+
+    <button type="submit">Add Exam Training</button>
+</EditForm>
+
+@code {
+    private List<ExamTrainingDto> examTrainings;
+    private List<LocationDto> locations;
+    private List<StuntLeaderDto> stuntLeaders;
+    private ExamTrainingDto newExamTraining = new ExamTrainingDto { TrainingTypes = new List<TrainingTypeMappingDto>() };
+    private EditContext editContext;
+    private ValidationMessageStore validationMessageStore;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var allTrainings = await TrainingService.GetAllTrainingsAsync();
+            
+            examTrainings = allTrainings.OfType<ExamTrainingDto>().ToList();
+            Console.WriteLine($"Filtered {examTrainings.Count} exam trainings.");
+
+            locations = (await LocationService.GetAllLocationsAsync()).ToList();
+            stuntLeaders = (await StuntLeaderService.GetAllStuntLeadersAsync()).ToList();
+            editContext = new EditContext(newExamTraining);
+            validationMessageStore = new ValidationMessageStore(editContext);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in OnInitializedAsync: {ex.Message}");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (!newExamTraining.TrainingTypes.Any())
+        {
+            validationMessageStore.Add(() => newExamTraining.TrainingTypes, "At least one training type must be selected.");
+            editContext.NotifyValidationStateChanged();
+            return;
+        }
+
+        try
+        {
+            var addedTraining = await TrainingService.AddTrainingAsync(newExamTraining);
+            examTrainings.Add((ExamTrainingDto)addedTraining);
+            newExamTraining = new ExamTrainingDto { TrainingTypes = new List<TrainingTypeMappingDto>() };
+            editContext = new EditContext(newExamTraining);
+            validationMessageStore.Clear();
+        }
+        catch (InvalidOperationException ex)
+        {
+            validationMessageStore.Add(() => newExamTraining.Description, ex.Message);
+            editContext.NotifyValidationStateChanged();
+        }
+    }
+
+    private void OnTrainingTypeCheckedChanged(ChangeEventArgs e, TrainingType trainingType)
+    {
+        var isChecked = ((ChangeEventArgs)e).Value != null && bool.Parse(((ChangeEventArgs)e).Value.ToString());
+
+        if (isChecked)
+        {
+            if (!newExamTraining.TrainingTypes.Any(tt => tt.TrainingType == trainingType))
+            {
+                newExamTraining.TrainingTypes.Add(new TrainingTypeMappingDto { TrainingType = trainingType });
+            }
+        }
+        else
+        {
+            var itemToRemove = newExamTraining.TrainingTypes.FirstOrDefault(tt => tt.TrainingType == trainingType);
+            if (itemToRemove != null)
+            {
+                newExamTraining.TrainingTypes.Remove(itemToRemove);
+            }
+        }
+    }
+    private void NavigateToDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/trainings/details/{id}");
+    }
+}

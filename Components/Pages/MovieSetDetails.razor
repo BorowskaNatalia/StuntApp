@@ -1,0 +1,209 @@
+﻿@page "/moviesets/details/{Id:int}"
+@using Stunt.ModelsDto
+@using Stunt.Components.Services.Interfaces
+@using Stunt.Enum
+@inject IMovieSetService MovieSetService
+@inject IStuntmanService StuntmanService
+@inject IHorseService HorseService
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+    private MovieSetDto movieSet;
+    private List<StuntmanDto> stuntmen = new List<StuntmanDto>();
+    private List<HorseDto> horses = new List<HorseDto>();
+    private int selectedStuntmanId;
+    private int selectedHorseId;
+    private DateTime departureDate;
+    private DateTime returnDate;
+    private bool isLoading = true;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMovieSetData();
+        isLoading = false;
+    }
+
+    private async Task LoadMovieSetData()
+    {
+        try
+        {
+            movieSet = await MovieSetService.GetMovieSetByIdAsync(Id);
+            stuntmen = (await StuntmanService.GetAllStuntmenAsync()).ToList();
+            horses = (await HorseService.GetActiveHorsesAsync()).ToList();
+
+            if (movieSet != null)
+            {
+                movieSet.Stuntmen = movieSet.Stuntmen ?? new List<MovieStuntmanDto> { Capacity = 0 };
+                movieSet.Horses = movieSet.Horses;
+                if (movieSet.Horses == null)
+                {
+                    movieSet.Horses = new List<MovieHorseDto>();
+                }
+            }
+            else
+            {
+                errorMessage = "Movie set not found";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+    }
+
+    private async Task AddStuntmanToMovieSet()
+    {
+        errorMessage = null;
+        try
+        {
+            if (selectedStuntmanId != 0 && departureDate >= movieSet.StartDate && returnDate <= movieSet.EndDate && departureDate <= returnDate)
+            {
+                await MovieSetService.AddStuntmanToMovieSet(Id, selectedStuntmanId, departureDate, returnDate);
+                await LoadMovieSetData(); 
+            }
+            else
+            {
+                errorMessage = "Invalid dates. Ensure the dates are within the movie set dates and the departure date is before the return date.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task AddHorseToMovieSet()
+    {
+        errorMessage = null;
+        try
+        {
+            if (selectedHorseId != 0 && departureDate >= movieSet.StartDate && returnDate <= movieSet.EndDate && departureDate <= returnDate)
+            {
+                await MovieSetService.AddHorseToMovieSetAsync(Id, selectedHorseId, departureDate, returnDate);
+                await LoadMovieSetData(); // Refresh the movie set details
+            }
+            else
+            {
+                errorMessage = "Invalid dates. Ensure the dates are within the movie set dates and the departure date is before the return date.";
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task RemoveStuntmanFromMovieSet(int stuntmanId)
+    {
+        await MovieSetService.RemoveStuntmanFromMovieSet(Id, stuntmanId);
+        await LoadMovieSetData();
+    }
+
+    private async Task RemoveHorseFromMovieSet(int horseId)
+    {
+        await MovieSetService.RemoveHorseFromMovieSetAsync(Id, horseId);
+        await LoadMovieSetData();
+    }
+}
+
+<h3>Movie Set Details</h3>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (movieSet != null)
+{
+    <div>
+        <p><strong>Title:</strong> @movieSet.Title</p>
+        <p><strong>Budget:</strong> @movieSet.Budget</p>
+        <p><strong>Address:</strong> @movieSet.Address</p>
+        <p><strong>Start Date:</strong> @movieSet.StartDate.ToShortDateString()</p>
+        <p><strong>End Date:</strong> @movieSet.EndDate.ToShortDateString()</p>
+        <div>
+            <h4>Assigned Stuntmen</h4>
+            <ul>
+                @if (movieSet.Stuntmen != null)
+                {
+                    @foreach (var stuntman in movieSet.Stuntmen)
+                    {
+                        <li>@stuntman.StuntmanName
+                            <button @onclick="() => RemoveStuntmanFromMovieSet(stuntman.IdPerson)">Remove</button>
+                        </li>
+                    }
+                }
+            </ul>
+        </div>
+        <div>
+            <h4>Add Stuntman to Movie Set</h4>
+            <label>Select Stuntman:</label>
+            <InputSelect @bind-Value="selectedStuntmanId">
+                <option value="0">Select a stuntman</option>
+                @foreach (var stuntman in stuntmen)
+                {
+                    <option value="@stuntman.IdPerson">@stuntman.Name @stuntman.Surname</option>
+                }
+            </InputSelect>
+            <div>
+                <label>Departure Date:</label>
+                <InputDate @bind-Value="departureDate" />
+            </div>
+            <div>
+                <label>Return Date:</label>
+                <InputDate @bind-Value="returnDate" />
+            </div>
+            <button @onclick="AddStuntmanToMovieSet">Add Stuntman</button>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@errorMessage</div>
+            }
+        </div>
+        <div>
+            <h4>Assigned Horses</h4>
+            <ul>
+                @if (movieSet.Horses != null)
+                {
+                    @foreach (var horse in movieSet.Horses)
+                    {
+                        <li>@horse.HorseName
+                            <button @onclick="() => RemoveHorseFromMovieSet(horse.IdHorse)">Remove</button>
+                        </li>
+                    }
+                }
+            </ul>
+        </div>
+        <div>
+            <h4>Add Horse to Movie Set</h4>
+            <label>Select Horse:</label>
+            <InputSelect @bind-Value="selectedHorseId">
+                <option value="0">Select a horse</option>
+                @foreach (var horse in horses)
+                {
+                    <option value="@horse.IdHorse">@horse.Name</option>
+                }
+            </InputSelect>
+            <div>
+                <label>Departure Date:</label>
+                <InputDate @bind-Value="departureDate" />
+            </div>
+            <div>
+                <label>Return Date:</label>
+                <InputDate @bind-Value="returnDate" />
+            </div>
+            <button @onclick="AddHorseToMovieSet">Add Horse</button>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@errorMessage</div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <p>Movie set not found.</p>
+}
